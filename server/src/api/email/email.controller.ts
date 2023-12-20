@@ -29,7 +29,7 @@ export const sendEmail: RequestHandler = async (req: BodyRequest<Email>, res) =>
     res.json(info);
 
   } catch (error: any) {
-
+    console.log(error);
     res.status(500).json({ error: 'Error sending email', message: error.message });
   }
 

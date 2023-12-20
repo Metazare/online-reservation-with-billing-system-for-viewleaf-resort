@@ -53,6 +53,15 @@ Follow these steps to get your MERN stack application up and running:
       MONGO_URI = your-mongodb-connection-string
       JWT_ACCESS = your-secret-key
       JWT_REFRESH = your-secret-key
+      EMAIL = admin@example.com
+      NODEMAILER_EMAIL = admin@example.com
+      NODEMAILER_PASSWORD = admin123
+      NODE_ENV = development
+      PASSWORD = admin
+      USERNAME = admin
+      SEMAPHORE_KEY = Semaphore Secret API Key
+      SEMAPHORE_SENDER = Semaphore Sender Name
+      PAYMONGO_SECRET = Paymongo Secret Key
     ```
     2.5. Start the server development servers:
     ```shell

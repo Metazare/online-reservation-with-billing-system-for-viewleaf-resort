@@ -13,4 +13,6 @@ export default cleanEnv(process.env, {
     EMAIL: str(),
     NODEMAILER_EMAIL: str(),
     NODEMAILER_PASSWORD: str(),
+    SEMPAHORE_SENDER: str(),
+    SEMAPHORE_KEY: str(),
 });

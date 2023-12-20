@@ -55,6 +55,14 @@ const reservationSchema = new Schema(
                 }
             }
         ],
+        paymongo: {
+            type: {
+                id: String,
+                url: String,
+                ref: String,
+                status: String
+            }
+        }
     },
     {
         timestamps: true,

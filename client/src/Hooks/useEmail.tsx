@@ -9,9 +9,8 @@ interface Data {
 interface SendEmailData {
   email: string,
   subject: string,
-  content: unknown
+  content: string
 }
-
 
 function useEmail(): Data {
 
@@ -27,7 +26,8 @@ function useEmail(): Data {
         console.log(response.data);
       });
     } catch (error: any) {
-      console.log(error);
+      console.log(error)
+      alert(error?.response?.data?.error ?? "Error sending email. Please try again later,");
     }
   }
 

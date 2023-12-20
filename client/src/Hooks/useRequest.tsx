@@ -32,9 +32,11 @@ function useRequest(): RequestHook {
       setError(error);
       console.error('Error making request:', error);
       if (error?.response?.data?.errors?.[0]?.message) {
-        alert(error?.response?.data?.errors?.[0]?.message);
+        console.log(error, 1)
+        // alert(error?.response?.data?.errors?.[0]?.message);
       } else {
-        alert(error?.response?.data?.message);
+        console.log(error, error?.response?.data, 2)
+        // alert(error?.response?.data?.message);
       }
     } finally {
       setLoading(false);

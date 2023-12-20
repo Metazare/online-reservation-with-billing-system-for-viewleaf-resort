@@ -35,6 +35,12 @@ export interface Reservation {
     schedule: Date;
     status: ReservationStatus;
     notes: Note[];
+    paymongo: {
+        id: string;
+        url: string;
+        ref: string;
+        status: string;
+    }
 }
 
 export interface ReservationDocument extends Reservation, Document {
@@ -59,6 +65,7 @@ export type ReserveAccommodation = {
     }[];
     total: number;
     minimum: number;
+    title: string;
 };
 
 export type CreateReservation = {

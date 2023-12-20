@@ -22,6 +22,8 @@ import ReservationModel from './reservation.model';
 import receiptModel from '../receipt/receipt.model';
 import feedbackModel from '../feedback/feedback.model';
 import { CreateFeedback } from '../feedback/feedback.types';
+import { send as sendSMS } from '../../utilities/semaphore';
+import { create as createPaymongoInvoice, retrieve as retrievePaymongoInvoice } from '../../utilities/paymongo';
 
 const openReservationStatuses = [
     ReservationStatus.CANCELLED,
@@ -50,7 +52,29 @@ export const getReservations: RequestHandler = async (req: QueryRequest<GetReser
         reservationQuery.status = status;
     }
 
-    const reservations: ReservationDocument[] = await ReservationModel.find(reservationQuery).exec();
+    var reservations: ReservationDocument[] = await ReservationModel.find(reservationQuery).exec();
+    if (!reservations) throw new NotFound('Reservation');
+
+    let updateCount = 0;
+    for (let i = 0; i < reservations.length; i++) {
+        const reservation = reservations[i];
+        if (reservation?.paymongo?.status === 'unpaid') {
+            reservation.paymongo = await retrievePaymongoInvoice(reservation?.paymongo?.id);
+            if (reservation?.paymongo?.status === 'paid') {
+                reservation.status = ReservationStatus.PAID;
+            }
+            await reservation.save();
+            updateCount++;
+            if (reservation?.paymongo.status === 'paid') {
+                const sms_phone = reservation?.customer?.phone;
+                const sms_content = `Thank you! we received your payment for reservation #${reservation?.reservationId} and currently verifying it. We'll update you shortly!`;
+                await sendSMS(sms_phone, sms_content)
+                    .catch((e) => console.log('Error sending SMS', e))
+            }
+        }
+    }
+
+    if (updateCount > 0) reservations = await ReservationModel.find(reservationQuery).exec();
     if (!reservations) throw new NotFound('Reservation');
 
     const reservationWithInvoices: ReservationInfo[] = await Promise.all(
@@ -105,14 +129,19 @@ export const createReservation: RequestHandler = async (req: BodyRequest<CreateR
     checker.checkArray(accommodations, 1, 'accommodations');
     if (checker.size() > 0) throw new UnprocessableEntity(checker.errors);
 
+    const pmItems = [];
+    let pmAmount = 0;
+
     for (let i = 0; i < accommodations.length; i++) {
-        const { accommodationId, shift, guests, inclusions = [], total, minimum } = accommodations[i];
+        const { accommodationId, shift, guests, inclusions = [], total, minimum, title } = accommodations[i];
 
         checker.checkType(accommodationId, 'string', `accommodations.${i}.accommodationId`);
         checker.checkType(shift, 'string', `accommodations.${i}.shift`);
         checker.checkType(guests, 'object', `accommodations.${i}.guests`);
         checker.checkType(total, 'number', `accommodations.${i}.total`);
         checker.checkType(minimum, 'number', `accommodations.${i}.minimum`);
+        checker.checkType(title, 'string', `accommodations.${i}.title`);
+
         if (checker.size() > 0) continue;
 
         const { adult = 0, kids = 0, senior = 0, pwd = 0 } = guests;
@@ -130,7 +159,13 @@ export const createReservation: RequestHandler = async (req: BodyRequest<CreateR
             checker.checkType(name, 'string', `accommodations.${i}.inclusions.${j}.name`);
             checker.checkType(quantity, 'number', `accommodations.${i}.inclusions.${j}.quantity`);
         }
+
+        if (checker.size() > 0) continue;
+        pmAmount += total;
+        pmItems.push(`₱${total} - ${title}`);
     }
+
+    const pmDescription = pmItems.join("\n");
 
     if (checker.size() > 0) throw new UnprocessableEntity(checker.errors);
 
@@ -211,6 +246,13 @@ export const createReservation: RequestHandler = async (req: BodyRequest<CreateR
         );
     }
 
+    const pmData = await createPaymongoInvoice({
+        amount: pmAmount,
+        description: pmDescription,
+    });
+
+    reservation.paymongo = pmData;
+
     await reservation.save();
     await Promise.all(invoices.map((invoice) => invoice.save()));
 
@@ -219,7 +261,7 @@ export const createReservation: RequestHandler = async (req: BodyRequest<CreateR
         //     reservation.status = ReservationStatus.CANCELLED;
         //     reservation.save();
         // }
-        ReservationModel.findOneAndUpdate({_id: reservation._id, status: ReservationStatus.PENDING}, {$set:{status: ReservationStatus.CANCELLED}}).exec();
+        ReservationModel.findOneAndUpdate({ _id: reservation._id, status: ReservationStatus.PENDING }, { $set: { status: ReservationStatus.CANCELLED } }).exec();
     }, 1000 * 60 * reservationTimeLimitInMinutes);
 
     res.status(201).json({ reservationId: reservation.reservationId });
